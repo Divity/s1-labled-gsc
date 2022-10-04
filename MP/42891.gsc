@@ -1,0 +1,506 @@
+/*******************************************************************
+ * Decompiled By: AgreedBog381
+ * Decompiled File: 42891.gsc
+ * Game: Call of Duty: Advanced Warfare
+ * Platform: PC
+ * Function Count: 22
+ * Decompile Time: 9 ms
+ * Timestamp: 4/20/2022 8:18:26 PM
+*******************************************************************/
+
+//Function Number: 1
+lib_A78B::gethighestscoringplayer()
+{
+	lib_A78B::updateplacement();
+	if(!level.placement["all"].size)
+	{
+		return undefined;
+	}
+
+	return level.placement["all"][0];
+}
+
+//Function Number: 2
+lib_A78B::gethighestscoringplayersarray(param_00)
+{
+	var_01 = [];
+	if(param_00 < 0)
+	{
+		return var_01;
+	}
+
+	lib_A78B::updateplacement();
+	for(var_02 = 0;var_02 < param_00;var_02++)
+	{
+		if(level.placement["all"].size == var_02)
+		{
+			break;
+		}
+
+		var_01[var_02] = level.placement["all"][var_02];
+	}
+
+	return var_01;
+}
+
+//Function Number: 3
+lib_A78B::getlosingplayers()
+{
+	lib_A78B::updateplacement();
+	var_00 = level.placement["all"];
+	var_01 = [];
+	foreach(var_03 in var_00)
+	{
+		if(var_03 == level.placement["all"][0])
+		{
+			continue;
+		}
+
+		var_01[var_01.size] = var_03;
+	}
+
+	return var_01;
+}
+
+//Function Number: 4
+lib_A78B::updatescorestatsffa(param_00,param_01)
+{
+	if(level.teambased)
+	{
+		return;
+	}
+
+	param_00 maps\mp\gametypes\_persistance::func_8D74("round","score",param_00.extrascore0);
+	param_00 maps\mp\gametypes\_persistance::func_8D4A("score",param_01);
+	if(param_01 > 0)
+	{
+		param_00 maps\mp\gametypes\_missions::processchallenge("ch_" + level.gametype + "_veteran",param_01);
+	}
+}
+
+//Function Number: 5
+lib_A78B::giveplayerscore(param_00,param_01,param_02)
+{
+	if(isdefined(param_01.owner))
+	{
+		param_01 = param_01.owner;
+	}
+
+	if(!isplayer(param_01))
+	{
+		return;
+	}
+
+	param_01 maps\mp\killstreaks\_killstreaks::giveadrenaline(param_00);
+	var_03 = param_01.connectedpostgame["score"];
+	lib_A78B::onplayerscore(param_00,param_01,param_02);
+	var_04 = param_01.connectedpostgame["score"] - var_03;
+	if(var_04 == 0)
+	{
+		return;
+	}
+
+	if(param_01.connectedpostgame["score"] < 65535)
+	{
+		param_01.score = param_01.connectedpostgame["score"];
+	}
+
+	if(level.teambased)
+	{
+		param_01 maps\mp\gametypes\_persistance::func_8D74("round","score",param_01.score);
+		param_01 maps\mp\gametypes\_persistance::func_8D4A("score",var_04);
+		if(var_04 > 0)
+		{
+			param_01 maps\mp\gametypes\_missions::processchallenge("ch_" + level.gametype + "_veteran",var_04);
+		}
+	}
+
+	if(!level.teambased)
+	{
+		level thread lib_A78B::sendupdateddmscores();
+		param_01 maps\mp\gametypes\_gamelogic::checkplayerscorelimitsoon();
+	}
+
+	param_01 maps\mp\gametypes\_gamelogic::checkscorelimit();
+}
+
+//Function Number: 6
+lib_A78B::onplayerscore(param_00,param_01,param_02)
+{
+	var_03 = undefined;
+	if(isdefined(level.onplayerscore))
+	{
+		var_03 = [[ level.onplayerscore ]](param_00,param_01,param_02);
+	}
+
+	if(!isdefined(var_03))
+	{
+		var_03 = maps\mp\gametypes\_rank::getscoreinfovalue(param_00);
+	}
+
+	param_01.connectedpostgame["score"] = param_01.connectedpostgame["score"] + var_03 * level.objectivepointsmod;
+}
+
+//Function Number: 7
+lib_A78B::_setplayerscore(param_00,param_01)
+{
+	if(param_01 == param_00.connectedpostgame["score"])
+	{
+		return;
+	}
+
+	param_00.connectedpostgame["score"] = param_01;
+	param_00.score = param_00.connectedpostgame["score"];
+	param_00 thread maps\mp\gametypes\_gamelogic::checkscorelimit();
+}
+
+//Function Number: 8
+lib_A78B::_getplayerscore(param_00)
+{
+	return param_00.connectedpostgame["score"];
+}
+
+//Function Number: 9
+lib_A78B::giveteamscoreforobjective(param_00,param_01)
+{
+	param_01 = param_01 * level.objectivepointsmod;
+	lib_A78B::_setteamscore(param_00,lib_A78B::_getteamscore(param_00) + param_01);
+	level notify("update_team_score",param_00,lib_A78B::_getteamscore(param_00));
+	thread lib_A78B::giveteamscoreforobjectiveendofframe();
+}
+
+//Function Number: 10
+lib_A78B::giveteamscoreforobjectiveendofframe()
+{
+	level endon("update_team_score");
+	level endon("game_ended");
+	waittillframeend;
+	var_00 = lib_A78B::getwinningteam();
+	if(!level.splitscreen && var_00 != "none" && var_00 != level.waswinning && gettime() - level.laststatustime > 5000 && maps\mp\_utility::getscorelimit() != 1)
+	{
+		level.laststatustime = gettime();
+		maps\mp\_utility::leaderdialog("lead_taken",var_00,"status");
+		if(level.waswinning != "none")
+		{
+			maps\mp\_utility::leaderdialog("lead_lost",level.waswinning,"status");
+		}
+	}
+
+	if(var_00 != "none")
+	{
+		level.waswinning = var_00;
+		var_01 = lib_A78B::_getteamscore(var_00);
+		var_02 = maps\mp\_utility::getwatcheddvar("scorelimit");
+		if(var_01 == 0 || var_02 == 0)
+		{
+			return;
+		}
+
+		var_03 = var_01 / var_02 * 100;
+		if(var_03 > level.scorepercentagecutoff)
+		{
+			setnojipscore(1);
+		}
+	}
+}
+
+//Function Number: 11
+lib_A78B::getwinningteam()
+{
+	if(maps\mp\_utility::practiceroundgame())
+	{
+		return "none";
+	}
+
+	var_00 = level.teamnamelist;
+	var_01 = var_00[0];
+	var_02 = game["teamScores"][var_00[0]];
+	var_03 = 1;
+	for(var_04 = 1;var_04 < var_00.size;var_04++)
+	{
+		if(game["teamScores"][var_00[var_04]] > var_02)
+		{
+			var_01 = var_00[var_04];
+			var_02 = game["teamScores"][var_00[var_04]];
+			var_03 = 1;
+			continue;
+		}
+
+		if(game["teamScores"][var_00[var_04]] == var_02)
+		{
+			var_03 = var_03 + 1;
+			var_01 = "none";
+		}
+	}
+
+	return var_01;
+}
+
+//Function Number: 12
+lib_A78B::_setteamscore(param_00,param_01)
+{
+	if(param_01 == game["teamScores"][param_00])
+	{
+		return;
+	}
+
+	game["teamScores"][param_00] = param_01;
+	lib_A78B::updateteamscore(param_00);
+	if((maps\mp\_utility::inovertime() && !isdefined(level.overtimescorewinoverride)) || isdefined(level.overtimescorewinoverride) && !level.overtimescorewinoverride)
+	{
+		thread maps\mp\gametypes\_gamelogic::onscorelimit();
+		return;
+	}
+
+	thread maps\mp\gametypes\_gamelogic::checkteamscorelimitsoon(param_00);
+	thread maps\mp\gametypes\_gamelogic::checkscorelimit();
+}
+
+//Function Number: 13
+lib_A78B::updateteamscore(param_00)
+{
+	var_01 = 0;
+	if(!maps\mp\_utility::isroundbased() || !maps\mp\_utility::isobjectivebased())
+	{
+		var_01 = lib_A78B::_getteamscore(param_00);
+	}
+	else
+	{
+		var_01 = game["roundsWon"][param_00];
+	}
+
+	setteamscore(param_00,var_01);
+}
+
+//Function Number: 14
+lib_A78B::_getteamscore(param_00)
+{
+	return game["teamScores"][param_00];
+}
+
+//Function Number: 15
+lib_A78B::sendupdatedteamscores()
+{
+	level notify("updating_scores");
+	level endon("updating_scores");
+	wait(0.05);
+	maps\mp\_utility::waittillslowprocessallowed();
+	foreach(var_01 in level.var_328)
+	{
+		var_01 method_829F();
+	}
+}
+
+//Function Number: 16
+lib_A78B::sendupdateddmscores()
+{
+	level notify("updating_dm_scores");
+	level endon("updating_dm_scores");
+	wait(0.05);
+	maps\mp\_utility::waittillslowprocessallowed();
+	for(var_00 = 0;var_00 < level.var_328.size;var_00++)
+	{
+		level.var_328[var_00] method_82A0();
+		level.var_328[var_00].updateddmscores = 1;
+	}
+}
+
+//Function Number: 17
+lib_A78B::removedisconnectedplayerfromplacement()
+{
+	var_00 = 0;
+	var_01 = level.placement["all"].size;
+	var_02 = 0;
+	for(var_03 = 0;var_03 < var_01;var_03++)
+	{
+		if(level.placement["all"][var_03] == self)
+		{
+			var_02 = 1;
+		}
+
+		if(var_02)
+		{
+			level.placement["all"][var_03] = level.placement["all"][var_03 + 1];
+		}
+	}
+
+	if(!var_02)
+	{
+		return;
+	}
+
+	level.placement["all"][var_01 - 1] = undefined;
+	if(level.multiteambased)
+	{
+		lib_A78B::mtdm_updateteamplacement();
+	}
+
+	if(level.teambased)
+	{
+		lib_A78B::updateteamplacement();
+		return;
+	}
+
+	var_01 = level.placement["all"].size;
+	for(var_03 = 0;var_03 < var_01;var_03++)
+	{
+		var_04 = level.placement["all"][var_03];
+		var_04 notify("update_outcome");
+	}
+}
+
+//Function Number: 18
+lib_A78B::updateplacement()
+{
+	var_00 = [];
+	foreach(var_02 in level.var_328)
+	{
+		if(isdefined(var_02.var_214A))
+		{
+			continue;
+		}
+
+		if(var_02.connectedpostgame["team"] == "spectator" || var_02.connectedpostgame["team"] == "none")
+		{
+			continue;
+		}
+
+		var_00[var_00.size] = var_02;
+	}
+
+	for(var_04 = 1;var_04 < var_00.size;var_04++)
+	{
+		var_02 = var_00[var_04];
+		var_05 = var_02.score;
+		if(!level.teambased)
+		{
+			var_05 = var_02.extrascore0;
+		}
+
+		for(var_06 = var_04 - 1;var_06 >= 0 && lib_A78B::getbetterplayer(var_02,var_00[var_06]) == var_02;var_06--)
+		{
+			var_00[var_06 + 1] = var_00[var_06];
+		}
+
+		var_00[var_06 + 1] = var_02;
+	}
+
+	level.placement["all"] = var_00;
+	if(level.multiteambased)
+	{
+		lib_A78B::mtdm_updateteamplacement();
+	}
+	else if(level.teambased)
+	{
+		lib_A78B::updateteamplacement();
+	}
+}
+
+//Function Number: 19
+lib_A78B::getbetterplayer(param_00,param_01)
+{
+	if(param_00.score > param_01.score)
+	{
+		return param_00;
+	}
+
+	if(param_01.score > param_00.score)
+	{
+		return param_01;
+	}
+
+	if(param_00.deaths < param_01.deaths)
+	{
+		return param_00;
+	}
+
+	if(param_01.deaths < param_00.deaths)
+	{
+		return param_01;
+	}
+
+	if(common_scripts\utility::cointoss())
+	{
+		return param_00;
+	}
+
+	return param_01;
+}
+
+//Function Number: 20
+lib_A78B::updateteamplacement()
+{
+	var_00["allies"] = [];
+	var_00["axis"] = [];
+	var_00["spectator"] = [];
+	var_01 = level.placement["all"];
+	var_02 = var_01.size;
+	for(var_03 = 0;var_03 < var_02;var_03++)
+	{
+		var_04 = var_01[var_03];
+		var_05 = var_04.connectedpostgame["team"];
+		var_00[var_05][var_00[var_05].size] = var_04;
+	}
+
+	level.placement["allies"] = var_00["allies"];
+	level.placement["axis"] = var_00["axis"];
+}
+
+//Function Number: 21
+lib_A78B::mtdm_updateteamplacement()
+{
+	var_00["spectator"] = [];
+	foreach(var_02 in level.teamnamelist)
+	{
+		var_00[var_02] = [];
+	}
+
+	var_04 = level.placement["all"];
+	var_05 = var_04.size;
+	for(var_06 = 0;var_06 < var_05;var_06++)
+	{
+		var_07 = var_04[var_06];
+		var_08 = var_07.connectedpostgame["team"];
+		var_00[var_08][var_00[var_08].size] = var_07;
+	}
+
+	foreach(var_02 in level.teamnamelist)
+	{
+		level.placement[var_02] = var_00[var_02];
+	}
+}
+
+//Function Number: 22
+lib_A78B::initialdmscoreupdate()
+{
+	wait(0.2);
+	var_00 = 0;
+	for(;;)
+	{
+		var_01 = 0;
+		var_02 = level.var_328;
+		for(var_03 = 0;var_03 < var_02.size;var_03++)
+		{
+			var_04 = var_02[var_03];
+			if(!isdefined(var_04))
+			{
+				continue;
+			}
+
+			if(isdefined(var_04.updateddmscores))
+			{
+				continue;
+			}
+
+			var_04.updateddmscores = 1;
+			var_04 method_82A0();
+			var_01 = 1;
+			wait(0.5);
+		}
+
+		if(!var_01)
+		{
+			wait(3);
+		}
+	}
+}
